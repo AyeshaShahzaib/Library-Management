@@ -1,35 +1,32 @@
 import streamlit as st
 import pandas as pd
 
-# Load book data
+# Load data
 @st.cache_data
 def load_data():
     return pd.read_excel("library_books_real.xlsx")
 
 df = load_data()
 
-def display_books():
-    st.markdown("## 📚 Welcome to Your Smart Library System")
-    st.markdown("Manage your library like a pro! 🤓 Use the sidebar to:")
-    st.markdown("- 🔍 Search for books")
-    st.markdown("- 📕 Borrow a book")
-    st.markdown("- 📗 Return a book")
-
-    # Book statistics
+# --- HOME PAGE ---
+def home():
+    st.title("📚 Personal Library Manager")
+    st.markdown("Welcome, Ayesha! This is your personal book tracker. ✨")
     total = len(df)
-    available = len(df[df["Status"] == "Available"])
-    borrowed = len(df[df["Status"] == "Borrowed"])
+    to_read = len(df[df["Status"] == "To Read"])
+    reading = len(df[df["Status"] == "Reading"])
+    completed = len(df[df["Status"] == "Completed"])
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("📘 Total Books", total)
-    col2.metric("✅ Available", available)
-    col3.metric("📕 Borrowed", borrowed)
+    col2.metric("📖 To Read", to_read)
+    col3.metric("📚 Reading", reading)
+    col4.metric("✅ Completed", completed)
 
-    st.markdown("### 📖 Book List")
+    st.markdown("### 📖 Your Book Collection")
     st.dataframe(df, use_container_width=True)
 
-
-
+# --- SEARCH BOOKS ---
 def search_books(query):
     query = query.lower()
     filtered = df[
@@ -39,60 +36,56 @@ def search_books(query):
     ]
     return filtered
 
-def borrow_book(isbn, user_name):
-    if isbn in df["ISBN"].values:
-        book = df[df["ISBN"] == isbn]
-        if book["Status"].iloc[0] == "Available":
-            df.loc[df["ISBN"] == isbn, "Status"] = "Borrowed"
-            st.success(f"✅ {user_name} borrowed '{book['Title'].iloc[0]}'")
+# --- UPDATE READING STATUS ---
+def update_status():
+    st.subheader("📗 Update Book Status")
+    isbn = st.text_input("Enter ISBN")
+    new_status = st.selectbox("New Status", ["To Read", "Reading", "Completed"])
+    if st.button("Update"):
+        if isbn in df["ISBN"].values:
+            df.loc[df["ISBN"] == isbn, "Status"] = new_status
+            st.success(f"✅ Updated status to '{new_status}'")
         else:
-            st.warning("⚠️ Book is already borrowed.")
-    else:
-        st.error("❌ ISBN not found.")
+            st.error("❌ ISBN not found.")
 
-def return_book(isbn, user_name):
-    if isbn in df["ISBN"].values:
-        book = df[df["ISBN"] == isbn]
-        if book["Status"].iloc[0] == "Borrowed":
-            df.loc[df["ISBN"] == isbn, "Status"] = "Available"
-            st.success(f"✅ {user_name} returned '{book['Title'].iloc[0]}'")
+# --- ADD NEW BOOK ---
+def add_book():
+    st.subheader("➕ Add a New Book")
+    title = st.text_input("Title")
+    author = st.text_input("Author")
+    isbn = st.text_input("ISBN")
+    status = st.selectbox("Status", ["To Read", "Reading", "Completed"])
+    if st.button("Add Book"):
+        if isbn in df["ISBN"].astype(str).values:
+            st.warning("⚠️ This book already exists.")
         else:
-            st.warning("⚠️ Book was not borrowed.")
-    else:
-        st.error("❌ ISBN not found.")
+            new_row = pd.DataFrame([[title, author, isbn, status]], columns=["Title", "Author", "ISBN", "Status"])
+            df.loc[len(df)] = new_row.iloc[0]
+            st.success(f"📘 '{title}' added to your library!")
 
-# Streamlit interface
-st.title("📖 Library Management System")
+# --- FILTER BOOKS ---
+def filter_books():
+    st.subheader("📂 Filter Books by Status")
+    option = st.selectbox("Choose status", ["To Read", "Reading", "Completed"])
+    filtered = df[df["Status"] == option]
+    st.dataframe(filtered)
 
-menu = ["Home", "Search Books", "Borrow Book", "Return Book"]
-choice = st.sidebar.selectbox("Choose an Option", menu)
+# --- STREAMLIT NAVIGATION ---
+menu = ["Home", "Search Books", "Update Status", "Add Book", "Filter by Status"]
+choice = st.sidebar.selectbox("Menu", menu)
 
 if choice == "Home":
-    display_books()
-
+    home()
 elif choice == "Search Books":
-    st.subheader("🔍 Search for a Book")
-    st.markdown("Type a **Book Title**, **Author Name**, or **ISBN** to search:")
-    query = st.text_input("Search here...")
+    st.subheader("🔍 Search Books")
+    query = st.text_input("Search by title, author, or ISBN")
     if query:
-        results = search_books(query)
-        if not results.empty:
-            st.success(f"🔎 Found {len(results)} book(s):")
-            st.dataframe(results)
-        else:
-            st.warning("❌ No matching books found.")
-
-elif choice == "Borrow Book":
-    st.subheader("📕 Borrow a Book")
-    isbn = st.text_input("Enter ISBN of the book you want to borrow")
-    user = st.text_input("Enter Your Name")
-    if st.button("Borrow"):
-        borrow_book(isbn, user)
-
-elif choice == "Return Book":
-    st.subheader("📗 Return a Book")
-    isbn = st.text_input("Enter ISBN of the book you want to return")
-    user = st.text_input("Enter Your Name")
-    if st.button("Return"):
-        return_book(isbn, user)
+        result = search_books(query)
+        st.dataframe(result if not result.empty else pd.DataFrame([{"Message": "No results found"}]))
+elif choice == "Update Status":
+    update_status()
+elif choice == "Add Book":
+    add_book()
+elif choice == "Filter by Status":
+    filter_books()
 
